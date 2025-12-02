@@ -305,10 +305,11 @@
             Did you <a href="#" class="forgot-link">forget your password?</a>
         </p>
 
-        <form id="loginForm">
+        <form id="loginForm" method="POST" action="{{ route('login.perform') }}">
+            @csrf
             <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
             </div>
 
             <div class="form-group">
@@ -324,17 +325,15 @@
     </div>
 
     <script>
+        // Keep simple client-side validation, but let the form submit to server
         document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
-            if (username && password) {
-                    window.location.href = '/dashboard'; 
-            } else {
-                alert('Please enter both username and password!');
+            if (!email || !password) {
+                e.preventDefault();
+                alert('Please enter both email and password!');
             }
-
         });
 
         // Add floating animation to circles

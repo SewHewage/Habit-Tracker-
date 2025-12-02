@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Habit Tracker - Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; background: #fafafa; color: #333; min-height: 100vh; }
@@ -69,6 +70,8 @@
         .empty-state { text-align: center; padding: 60px 20px; color: #666; }
         .empty-state-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.5; }
         .empty-state h3 { font-size: 20px; margin-bottom: 8px; color: #1a1a1a; }
+        .loading { display: none; text-align: center; padding: 40px; color: #666; }
+        .loading.active { display: block; }
         @media (max-width: 768px) {
             .navbar { padding:16px 20px; }
             .container { padding: 32px 16px; }
@@ -140,13 +143,8 @@
                 <h2>My Habits</h2>
                 <button class="btn-add" onclick="openModal()"><span>+</span> <span>New Habit</span></button>
             </div>
-            <div class="habits-grid" id="habitsGrid">
-                <div class="empty-state">
-                    <div class="empty-state-icon">📝</div>
-                    <h3>No habits yet</h3>
-                    <p>Create your first habit to get started!</p>
-                </div>
-            </div>
+            <div class="loading active" id="loading">Loading habits...</div>
+            <div class="habits-grid" id="habitsGrid"></div>
         </div>
     </div>
 
@@ -187,11 +185,46 @@
         </div>
     </div>
 
+    <!-- Edit Habit Modal -->
+    <div class="modal" id="editHabitModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Habit</h2>
+                <p>Update your progress</p>
+            </div>
+            <form id="editHabitForm">
+                <div class="form-group">
+                    <label>Habit Name</label>
+                    <input type="text" id="editHabitName" readonly style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Streak (Days)</label>
+                    <input type="number" id="editHabitStreak" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Mark Days Completed</label>
+                    <div id="completedDaysContainer" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         let habits = [];
         let selectedEmoji = "🏃";
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const csrfToken = $('meta[name="csrf-token"]').attr('content');
         const userName = "{{ $user->name ?? 'User' }}";
+
+        // Setup AJAX defaults
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': csrfToken
+            }
+        });
 
         // Set greeting based on time
         function setGreeting() {
@@ -202,64 +235,59 @@
             if (hour >= 12 && hour < 17) greeting = "Good afternoon";
             else if (hour >= 17) greeting = "Good evening";
 
-            document.getElementById('greeting').textContent = `${greeting}, ${firstName}`;
+            $('#greeting').text(`${greeting}, ${firstName}`);
         }
 
-        // Fetch habits
-        async function fetchHabits() {
-            try {
-                const response = await fetch('/habits', {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken
-                    },
-                    credentials: 'same-origin'
-                });
+        // Fetch habits using jQuery AJAX
+        function fetchHabits() {
+            $('#loading').addClass('active');
+            $('#habitsGrid').empty();
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+            $.ajax({
+                url: '/habits',
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    habits = data;
+                    console.log('Fetched habits:', habits);
+                    $('#loading').removeClass('active');
+                    renderHabits();
+                    updateStats();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error fetching habits:', error);
+                    $('#loading').removeClass('active');
+                    $('#habitsGrid').html(`
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⚠️</div>
+                            <h3>Error loading habits</h3>
+                            <p>${error || 'Failed to load habits'}</p>
+                        </div>
+                    `);
                 }
-
-                habits = await response.json();
-                console.log('Fetched habits:', habits);
-                renderHabits();
-                updateStats();
-            } catch (error) {
-                console.error('Error fetching habits:', error);
-                document.getElementById('habitsGrid').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
-                        <h3>Error loading habits</h3>
-                        <p>${error.message}</p>
-                    </div>
-                `;
-            }
+            });
         }
 
         function renderHabits() {
-            const grid = document.getElementById('habitsGrid');
+            const $grid = $('#habitsGrid');
 
             if (!habits || habits.length === 0) {
-                grid.innerHTML = `
+                $grid.html(`
                     <div class="empty-state">
                         <div class="empty-state-icon">📝</div>
                         <h3>No habits yet</h3>
                         <p>Create your first habit to get started!</p>
                     </div>
-                `;
+                `);
                 return;
             }
 
-            grid.innerHTML = '';
+            $grid.empty();
             const days = ['M','T','W','T','F','S','S'];
 
             habits.forEach(habit => {
-                const card = document.createElement('div');
-                const completed = Array.isArray(habit.completed) ? habit.completed : [];
+                const completed = Array.isArray(habit.completed) ? habit.completed : [false, false, false, false, false, false, false];
                 const isTodayCompleted = completed[6] || false;
-                card.className = `habit-card ${isTodayCompleted ? 'completed-today' : ''}`;
 
                 const weekCalendar = days.map((day, i) => `
                     <div class="day-box ${completed[i] ? 'completed' : ''}">
@@ -267,106 +295,193 @@
                         <div>${completed[i] ? '✓' : '○'}</div>
                     </div>`).join('');
 
-                card.innerHTML = `
-                    <div class="habit-header">
-                        <div class="habit-info">
-                            <div class="habit-name">${habit.name || 'Untitled Habit'}</div>
-                            <div class="habit-description">${habit.description || ''}</div>
+                const $card = $(`
+                    <div class="habit-card ${isTodayCompleted ? 'completed-today' : ''}" data-id="${habit.id}">
+                        <div class="habit-header">
+                            <div class="habit-info">
+                                <div class="habit-name">${habit.name || 'Untitled Habit'}</div>
+                                <div class="habit-description">${habit.description || ''}</div>
+                            </div>
+                            <div class="habit-emoji">${habit.emoji || '🏃'}</div>
                         </div>
-                        <div class="habit-emoji">${habit.emoji || '🏃'}</div>
+                        <div class="habit-stats">
+                            <div class="habit-streak"><span class="streak-icon">🔥</span> ${habit.streak || 0} days</div>
+                        </div>
+                        <div class="week-calendar">${weekCalendar}</div>
                     </div>
-                    <div class="habit-stats">
-                        <div class="habit-streak"><span class="streak-icon">🔥</span> ${habit.streak || 0} days</div>
-                    </div>
-                    <div class="week-calendar">${weekCalendar}</div>
-                `;
+                `);
 
-                card.addEventListener('click', () => toggleHabit(habit.id));
-                grid.appendChild(card);
+                $card.on('click', function() {
+                    openEditModal(habit);
+                });
+
+                $grid.append($card);
             });
         }
 
-        async function toggleHabit(id) {
-            try {
-                const habit = habits.find(h => h.id === id);
-                if (!habit) return;
+        function openEditModal(habit) {
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const completed = Array.isArray(habit.completed) ? habit.completed : [false, false, false, false, false, false, false];
 
-                // Ensure completed is an array
-                if (!Array.isArray(habit.completed)) {
-                    habit.completed = [false, false, false, false, false, false, false];
-                }
+            // Set habit name and streak
+            $('#editHabitName').val(habit.name);
+            $('#editHabitStreak').val(habit.streak || 0);
 
-                habit.completed[6] = !habit.completed[6];
-                if (habit.completed[6]) {
-                    habit.streak = (habit.streak || 0) + 1;
-                } else {
-                    habit.streak = Math.max(0, (habit.streak || 0) - 1);
-                }
+            // Create day toggles
+            const daysHtml = days.map((day, i) => `
+                <button type="button" class="day-toggle ${completed[i] ? 'active' : ''}" data-day="${i}" style="padding: 10px; border: 2px solid ${completed[i] ? '#22c55e' : '#e5e5e5'}; border-radius: 8px; background: ${completed[i] ? '#dcfce7' : '#fafafa'}; cursor: pointer; transition: all 0.2s; font-weight: 500;">
+                    ${day.substring(0, 3)}<br>${completed[i] ? '✓' : '○'}
+                </button>
+            `).join('');
+            $('#completedDaysContainer').html(daysHtml);
 
-                const response = await fetch(`/habits/${habit.id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json'
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({
-                        completed: habit.completed,
-                        streak: habit.streak
-                    })
+            // Store current habit id for form submission
+            $('#editHabitForm').data('habit-id', habit.id);
+            $('#editHabitModal').addClass('active');
+
+            // Handle day toggle clicks
+            $('.day-toggle').on('click', function(e) {
+                e.preventDefault();
+                $(this).toggleClass('active');
+                const isActive = $(this).hasClass('active');
+                $(this).css({
+                    'border-color': isActive ? '#22c55e' : '#e5e5e5',
+                    'background': isActive ? '#dcfce7' : '#fafafa'
                 });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                renderHabits();
-                updateStats();
-            } catch (error) {
-                console.error('Error toggling habit:', error);
-                alert('Failed to update habit. Please try again.');
-            }
+            });
         }
 
-        document.getElementById('habitForm').addEventListener('submit', async (e) => {
+        function closeEditModal() {
+            $('#editHabitModal').removeClass('active');
+        }
+
+        function toggleHabit(id) {
+            const habit = habits.find(h => h.id === id);
+            if (!habit) return;
+
+            // Ensure completed is an array
+            if (!Array.isArray(habit.completed)) {
+                habit.completed = [false, false, false, false, false, false, false];
+            }
+
+            const wasCompleted = habit.completed[6];
+            habit.completed[6] = !habit.completed[6];
+
+            if (habit.completed[6]) {
+                habit.streak = (habit.streak || 0) + 1;
+            } else {
+                habit.streak = Math.max(0, (habit.streak || 0) - 1);
+            }
+
+            $.ajax({
+                url: `/habits/${habit.id}`,
+                method: 'PUT',
+                dataType: 'json',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    completed: habit.completed,
+                    streak: habit.streak
+                }),
+                success: function(data) {
+                    console.log('Habit updated successfully:', data);
+                    renderHabits();
+                    updateStats();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error toggling habit:', error);
+                    // Revert changes on error
+                    habit.completed[6] = wasCompleted;
+                    if (wasCompleted) {
+                        habit.streak = (habit.streak || 0) + 1;
+                    } else {
+                        habit.streak = Math.max(0, (habit.streak || 0) - 1);
+                    }
+                    alert('Failed to update habit. Please try again.');
+                }
+            });
+        }
+
+        // Create habit using jQuery AJAX
+        $('#habitForm').on('submit', function(e) {
             e.preventDefault();
 
-            const newHabit = {
-                name: document.getElementById('habitName').value.trim(),
-                emoji: selectedEmoji,
-                description: document.getElementById('habitDescription').value.trim(),
-                streak: 0,
-                completed: [false, false, false, false, false, false, false]
-            };
+            const habitName = $('#habitName').val().trim();
+            const habitDescription = $('#habitDescription').val().trim();
 
-            if (!newHabit.name) {
+            if (!habitName) {
                 alert('Please enter a habit name');
                 return;
             }
 
-            try {
-                const response = await fetch('{{ route("habits.index") }}', {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
+            const newHabit = {
+                name: habitName,
+                emoji: selectedEmoji,
+                description: habitDescription,
+                streak: 0,
+                completed: [false, false, false, false, false, false, false]
+            };
+
+            $.ajax({
+                url: '/habits',
+                method: 'POST',
+                dataType: 'json',
+                data: newHabit,
+                success: function(data) {
+                    console.log('Habit created successfully:', data);
+                    habits.push(data);
+                    renderHabits();
+                    updateStats();
+                    closeModal();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error creating habit:', xhr.responseText || error);
+                    alert('Failed to create habit. Please try again.');
                 }
             });
+        });
 
+        // Edit habit using jQuery AJAX
+        $('#editHabitForm').on('submit', function(e) {
+            e.preventDefault();
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+            const habitId = $(this).data('habit-id');
+            const newStreak = parseInt($('#editHabitStreak').val()) || 0;
+            const completedDays = [];
+
+            // Collect completed days from toggles
+            $('.day-toggle').each(function() {
+                completedDays.push($(this).hasClass('active'));
+            });
+
+            const updateData = {
+                streak: newStreak,
+                completed: completedDays
+            };
+
+            console.log('Sending update:', updateData);
+
+            $.ajax({
+                url: `/habits/${habitId}`,
+                method: 'PUT',
+                dataType: 'json',
+                contentType: 'application/json',
+                data: JSON.stringify(updateData),
+                success: function(data) {
+                    console.log('Habit updated successfully:', data);
+                    // Update local habits array
+                    const habitIndex = habits.findIndex(h => h.id === habitId);
+                    if (habitIndex !== -1) {
+                        habits[habitIndex] = data;
+                    }
+                    renderHabits();
+                    updateStats();
+                    closeEditModal();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error updating habit:', xhr.status, xhr.responseText || error);
+                    alert('Failed to update habit. Status: ' + xhr.status);
                 }
-
-                const habit = await response.json();
-                habits.push(habit);
-                renderHabits();
-                updateStats();
-                closeModal();
-            } catch (error) {
-                console.error('Error creating habit:', error);
-                alert('Failed to create habit. Please try again.');
-            }
+            });
         });
 
         function updateStats() {
@@ -383,41 +498,41 @@
             const completion = habits.length ? Math.round((totalCompleted / (habits.length * 7)) * 100) : 0;
             const points = habits.reduce((sum, h) => sum + ((h.streak || 0) * 10), 0);
 
-            document.getElementById('activeHabits').textContent = active;
-            document.getElementById('currentStreak').textContent = streak;
-            document.getElementById('completionPercent').textContent = completion + '%';
-            document.getElementById('totalPoints').textContent = points;
+            $('#activeHabits').text(active);
+            $('#currentStreak').text(streak);
+            $('#completionPercent').text(completion + '%');
+            $('#totalPoints').text(points);
         }
 
         function openModal() {
-            document.getElementById('habitModal').classList.add('active');
+            $('#habitModal').addClass('active');
         }
 
         function closeModal() {
-            document.getElementById('habitModal').classList.remove('active');
-            document.getElementById('habitForm').reset();
-            document.querySelectorAll('.emoji-option').forEach(o => o.classList.remove('selected'));
-            document.querySelector('.emoji-option[data-emoji="🏃"]').classList.add('selected');
+            $('#habitModal').removeClass('active');
+            $('#habitForm')[0].reset();
+            $('.emoji-option').removeClass('selected');
+            $('.emoji-option[data-emoji="🏃"]').addClass('selected');
             selectedEmoji = "🏃";
         }
 
         // Emoji selection
-        document.querySelectorAll('.emoji-option').forEach(option => {
-            option.addEventListener('click', function() {
-                document.querySelectorAll('.emoji-option').forEach(o => o.classList.remove('selected'));
-                this.classList.add('selected');
-                selectedEmoji = this.dataset.emoji;
-            });
+        $('.emoji-option').on('click', function() {
+            $('.emoji-option').removeClass('selected');
+            $(this).addClass('selected');
+            selectedEmoji = $(this).data('emoji');
         });
 
         // Close modal on outside click
-        document.getElementById('habitModal').addEventListener('click', function(e) {
+        $('#habitModal').on('click', function(e) {
             if (e.target === this) closeModal();
         });
 
         // Initialize
-        setGreeting();
-        fetchHabits();
+        $(document).ready(function() {
+            setGreeting();
+            fetchHabits();
+        });
     </script>
 </body>
 </html>

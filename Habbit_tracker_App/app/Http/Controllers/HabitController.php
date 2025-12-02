@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Habit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class HabitController extends Controller
 {
@@ -29,6 +30,8 @@ class HabitController extends Controller
      */
     public function store(Request $request)
     {
+        Log::info('Habit store payload', $request->all());
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'emoji' => 'nullable|string|max:10',
@@ -38,16 +41,21 @@ class HabitController extends Controller
         ]);
 
         // Create habit with authenticated user's ID
-        $habit = Habit::create([
-            'user_id' => Auth::id(),
-            'name' => $validated['name'],
-            'emoji' => $validated['emoji'] ?? '🏃',
-            'description' => $validated['description'] ?? '',
-            'streak' => $validated['streak'] ?? 0,
-            'completed' => $validated['completed'] ?? [false, false, false, false, false, false, false],
-        ]);
+        try {
+            $habit = Habit::create([
+                'user_id' => Auth::id(),
+                'name' => $validated['name'],
+                'emoji' => $validated['emoji'] ?? '🏃',
+                'description' => $validated['description'] ?? '',
+                'streak' => $validated['streak'] ?? 0,
+                'completed' => $validated['completed'] ?? [false, false, false, false, false, false, false],
+            ]);
 
-        return response()->json($habit, 201);
+            return response()->json($habit, 201);
+        } catch (\Exception $e) {
+            Log::error('Failed creating habit', ['message' => $e->getMessage(), 'payload' => $request->all()]);
+            return response()->json(['error' => 'Failed to create habit'], 500);
+        }
     }
 
     /**
@@ -60,23 +68,35 @@ class HabitController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        Log::info('Habit update request', [
+            'habit_id' => $habit->id,
+            'request_all' => $request->all(),
+            'content_type' => $request->header('Content-Type')
+        ]);
+
         $validated = $request->validate([
             'streak' => 'nullable|integer',
             'completed' => 'nullable|array',
         ]);
 
-        // Update only the fields that are provided
-        if (isset($validated['streak'])) {
-            $habit->streak = $validated['streak'];
+        try {
+            // Update only the fields that are provided
+            if (isset($validated['streak'])) {
+                $habit->streak = $validated['streak'];
+            }
+
+            if (isset($validated['completed'])) {
+                $habit->completed = $validated['completed'];
+            }
+
+            $habit->save();
+
+            Log::info('Habit updated successfully', ['habit' => $habit->toArray()]);
+            return response()->json($habit);
+        } catch (\Exception $e) {
+            Log::error('Failed updating habit', ['message' => $e->getMessage(), 'habit_id' => $habit->id]);
+            return response()->json(['error' => 'Failed to update habit'], 500);
         }
-
-        if (isset($validated['completed'])) {
-            $habit->completed = $validated['completed'];
-        }
-
-        $habit->save();
-
-        return response()->json($habit);
     }
 
     /**

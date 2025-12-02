@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
+use Faker\Guesser\Name;
 use Illuminate\Support\Facades\Hash;
 
 class RegisterController extends Controller
@@ -26,7 +27,7 @@ class RegisterController extends Controller
         User::create([
             'first_name' => $request->first_name,
             'last_name'  => $request->last_name,
-
+            'name'       => $request->first_name . ' ' . $request->last_name,
             'email'      => $request->email,
             'username'   => $request->username,
             'password'   => $request->password,
