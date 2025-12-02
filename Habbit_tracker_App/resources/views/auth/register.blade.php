@@ -340,7 +340,7 @@
             <a href="#">Schedule A Demo</a>
             <a href="#" class="btn-learn">LEARN MORE</a>
             <a href="#">Blog</a>
-            <a href="#">Login</a>
+            <a href="/login">Login</a>
         </div>
     </nav>
 
@@ -349,81 +349,66 @@
         <h1>Register</h1>
         <p class="welcome-text">
             Create your account to access the Habit Sweets.<br>
-            Already have an account? <a href="#" class="login-link">Login here</a>
+            Already have an account? <a href="/login" class="login-link">Login here</a>
         </p>
 
-        <form id="registerForm">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="firstName">First Name</label>
-                    <input type="text" id="firstName" name="firstName" required>
-                </div>
+<form id="registerForm" method="POST" action="{{ route('register.store') }}">
+    @csrf
 
-                <div class="form-group">
-                    <label for="lastName">Last Name</label>
-                    <input type="text" id="lastName" name="lastName" required>
-                </div>
-            </div>
+    <!-- Display validation errors -->
+    @if($errors->any())
+        <div style="color:red; margin-bottom:15px;">
+            <ul>
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
-            <div class="form-group">
-                <label for="email">Email Address</label>
-                <input type="email" id="email" name="email" required>
-            </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label for="first_name">First Name</label>
+            <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}" required>
+        </div>
 
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="confirmPassword">Confirm Password</label>
-                    <input type="password" id="confirmPassword" name="confirmPassword" required>
-                </div>
-            </div>
-
-            <div class="checkbox-group">
-                <input type="checkbox" id="terms" name="terms" required>
-                <label for="terms" class="checkbox-label">
-                    I agree to the <a href="#" class="terms-link">Terms & Conditions</a> and <a href="#" class="terms-link">Privacy Policy</a>
-                </label>
-            </div>
-
-            <button type="submit" class="btn-register">
-                <span class="arrow-icon">➜</span>
-                Create Account
-            </button>
-        </form>
+        <div class="form-group">
+            <label for="last_name">Last Name</label>
+            <input type="text" id="last_name" name="last_name" value="{{ old('last_name') }}" required>
+        </div>
     </div>
 
+    <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" value="{{ old('email') }}" required>
+    </div>
+
+    <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" value="{{ old('username') }}" required>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required minlength="6">
+        </div>
+
+        <div class="form-group">
+            <label for="password_confirmation">Confirm Password</label>
+            <input type="password" id="password_confirmation" name="password_confirmation" required minlength="6">
+        </div>
+    </div>
+
+    <button type="submit" class="btn-register">
+        <span class="arrow-icon">➜</span>
+        Create Account
+    </button>
+</form>
+
+
+
     <script>
-        document.getElementById('registerForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-
-            if (password !== confirmPassword) {
-                alert('Passwords do not match!');
-                return;
-            }
-
-            const firstName = document.getElementById('firstName').value;
-            const lastName = document.getElementById('lastName').value;
-            const email = document.getElementById('email').value;
-            const username = document.getElementById('username').value;
-            const terms = document.getElementById('terms').checked;
-
-            if (firstName && lastName && email && username && password && terms) {
-                alert('Registration functionality would be implemented here!');
-            }
-        });
-
         // Add floating animation to circles
         const circles = document.querySelectorAll('.circle');
         circles.forEach((circle, index) => {

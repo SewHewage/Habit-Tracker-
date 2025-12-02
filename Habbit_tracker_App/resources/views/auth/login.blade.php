@@ -293,7 +293,7 @@
             <a href="#">Schedule A Demo</a>
             <a href="#" class="btn-learn">LEARN MORE</a>
             <a href="#">Blog</a>
-            <a href="#">Register</a>
+            <a href="/register">Register</a>
         </div>
     </nav>
 
@@ -301,7 +301,7 @@
     <div class="login-container">
         <h1>Login</h1>
         <p class="welcome-text">
-            Welcome back! Login to access the Sweet Marketplace.<br>
+            Welcome back! Login to access the Sweet Habits.<br>
             Did you <a href="#" class="forgot-link">forget your password?</a>
         </p>
 
@@ -330,8 +330,11 @@
             const password = document.getElementById('password').value;
 
             if (username && password) {
-                alert('Login functionality would be implemented here!');
+                    window.location.href = '/dashboard'; 
+            } else {
+                alert('Please enter both username and password!');
             }
+
         });
 
         // Add floating animation to circles

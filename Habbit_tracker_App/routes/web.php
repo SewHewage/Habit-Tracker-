@@ -1,27 +1,18 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\RegisterController;
-
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HabitController;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
 // Register
-Route::get('/register', [RegisterController::class, 'create'])->name('register.create');
+Route::get('/register', [RegisterController::class, 'create'])->name('register');
 Route::post('/register', [RegisterController::class, 'store'])->name('register.store');
 
 // Login
@@ -30,7 +21,14 @@ Route::post('/login', [LoginController::class, 'login'])->name('login.perform');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout.perform');
 
 // Dashboard
-Route::get('/dashboard', function () {
-    return view('auth.dashboard');
-})->middleware('auth')->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+// Habits (Protected)
+Route::middleware('auth')->group(function () {
+
+    Route::get('/habits', [HabitController::class, 'index'])->name('habits.index');
+
+    Route::post('/habits', [HabitController::class, 'store']);
+
+    Route::put('/habits/{habit}', [HabitController::class, 'update']);
+});
